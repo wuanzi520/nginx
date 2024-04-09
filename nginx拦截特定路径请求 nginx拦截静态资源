@@ -1,0 +1,301 @@
+一、静态代理
+
+　　Nginx静态代理是指将所有的静态资源，例如，css、js、html、jpg等资源存放到Nginx服务器，而不存放在应用服务器Tomcat中，当客户端发出的请求是对这些静态资源的请求时，Nginx直接将这些静态资源响应给客户端，而无需提交给应用服务器处理，这样就减轻了应用服务器的压力。
+
+（一）扩展名拦截
+
+　　1、修改配置文件
+
+location ~ .*\.(css|js|html|png|jpg)$ {
+                root /opt/statics;
+        }
+
+
+　　2、创建文件夹
+
+[root@lcl-aliyun ~]# vi /usr/local/nginx/conf/nginx.conf
+[root@lcl-aliyun ~]# mkdir /opt/statics
+[root@lcl-aliyun ~]# cd /opt/statics/
+[root@lcl-aliyun statics]# mkdir css js html images
+
+
+
+　　3、上传jpg图片到image文件夹　　
+
+　　　　
+
+nginx拦截特定路径请求 nginx拦截静态资源_服务器
+
+　　
+
+　　4、重启Nginx
+
+./nginx -s reload
+
+
+　　5、访问
+
+　　
+
+
+ 　　这里有个问题要说一下，当配置文件有问题时，reload命令并不会真正的使用新的配置文件，而是仍然使用老的配置，当配置检查没问题时，如果reload后还是不生效，可以重启一下试一试。 
+
+（二）目录名拦截
+
+　　1、修改配置文件并重启nginx
+
+location ~ .*(css|js|html|images).+ {
+                root /opt/static;
+        }
+
+
+　　2、访问地址： http://***/images/123.jpg
+
+（三）页面压缩　　
+
+　　1、浏览器常见的压缩协议
+
+压缩协议
+	说明
+
+deflate
+	是一种过时的压缩算法，是huffman编码的一种加强
+
+gzip
+	是目前大多数浏览器都支持的一种压缩算法，是对deflate的改进
+
+sdch
+	是谷歌开发的一种压缩算法，一种全新的压缩思路，deflate与gzip的压缩思想是，修改传输数据的编码格式以达到减少体量的目的，其最终的传输数据并没有减少，而sdch压缩算法的思想是，让冗余的数据仅出现一次，其最终的传输数据减少了。
+
+Zopfli
+	谷歌开发的一种压缩算法，Deflate压缩算法的改进，比标准的gzip-9要小3%-8%，但压缩用时是gzip-9的80多倍。
+
+br
+	即Brotli，谷歌开发的一种压缩算法，是一种全新的数据格式，与Zopfli相比，压缩率能够降低20%-26%，Brotli-1有着与Gzip-9相近的压缩比和更快的压缩解压速度。
+
+　　2、常用设置
+gzip  on;    　　　　　　#开启gzip压缩，默认为off
+    gzip_min_length 5k;    #指定最小启用压缩的文件大小
+    gzip_comp_level 4;     #指定压缩级别，取值为1-9，数字越大，压缩比越高，但压缩所用时间越长，默认为1，建议使用4
+    gzip_buffers 4 16k;    #4表示的是缓存颗粒数量，而16k表示的是缓存颗粒大小。
+    gzip_vary on;     　　　#开启动态压缩，默认为off
+    gzip_types text/html text/css test/xml application/x-javascriptg;          #通过MIME类型来指定要压缩的文件类型，默认值为text/html
+
+    server {
+        listen       80;
+
+　　说明，新版不需要配置text/html，因为zgip默认就会对该格式进行压缩。
+
+二、反向代理
+
+　　通过在location{}中添加代理proxy_pass可以指定当前Nginx所要代理的真正服务器。
+
+location /api/ {
+         proxy_pass       http://192.168.31.31:8080;
+    }
+
+　　其相关配置内容如下：
+
+　　　　client_max_body_size 100k；       Nginx允许客户端请求的单文件最大大小，单为是字节。
+
+　　　　cllient_body_buffer_size 80k;        Nginx为客户端请求设置的缓存大小。
+
+　　　　proxy_buffering on；                     开启从后端被代理服务器的响应内容缓冲区，默认为on
+
+　　　   proxy_buffers 4 8k;                        该指令用于设置缓冲区的数量与大小，从被代理的后端服务器取的的响应内容会缓存到这里
+
+              proxy_busy_buffers_size 16k;       高负荷下缓存大小，其默认值一般为单个proxy_buffers的2倍。
+
+              proxy_connect_timeout 60s;          Nginx跟后端服务器连接超时时间，默认为60秒。
+
+              proxy_read_timeout 60s;               Nginx发出请求后等待后端服务器响应的最长时限，默认60秒。
+三、负载均衡
+
+　　1、负载均衡简述
+
+　　　　硬件负载使用F5、Array、深信服、梭子鱼等，软件可以使用LVS、HAProxy、Nginx等。
+
+　　　　负载均衡在生产应用层面分为两类：七层负载均衡和四层负载均衡，同时，为四层负载均衡提供更为底层实现的，还有三层负载和两层负载
+
+　　　　　　七层负载均衡：应用层，基于HTTP协议，通过虚拟URL将请求分配到真实服务器，一般用于B/S架构，Nginx就是七层负载均衡。
+
+　　　　　　四层负载均衡：传输层，基于TCP协议，通过 ”虚拟IP + 端口号“将请求分配到真实的服务器。 一般用于C/S架构系统，例如LVS、F5、Nginx Plus都属于四层负载均衡。
+
+　　　　　　三层负载均衡：网络层，基于IP协议，通过虚拟IP将请求分配到真实服务器。
+
+　　　　　　二层负载均衡：链路层，基于虚拟MAC地址将请求分配到真是服务器。
+
+　　2、负载均衡配置
+
+　　　　主要是在location中使用proxy_pass进行配置，然后使用upstream进行配置负载均衡。
+
+upstream lcldemo {
+        192.168.1.105:8080 weight=1;
+        192.168.1.106:8080 weight=1;
+        192.168.1.107:8080 weight=1;
+    }
+
+    server {
+.......
+        location /lcl/nginx {
+                proxy_pass http://lcldemo/;
+        }
+
+
+　　3、负载均衡策略
+
+　　　　Nginx内置了三种负载均衡策略：轮询、ip哈希、最小连接数。另外，其还支持第三方的负载均衡。
+
+　　　　根据负载策略的不同，又可以设置很多性能相关的属性。
+
+　　　　（1）轮询
+
+　　　　　　轮询是默认的负载均衡策略，其是按照各个主机的权重比例依次进行请求分配的。
+
+upstream lcldemo {
+        192.168.1.105:8080 weight=2 fail_timeout=20 max_fail=3;
+        192.168.1.106:8080 weight=1 fail_timeout=20 max_fail=3;
+        192.168.1.107:8080 backup;
+        192.168.1.108:8080 down;
+    }
+
+
+　　　　　　backup：表示当前服务器为备用服务器
+
+　　　　　　down：表示当前服务器已停机
+
+　　　　　　fail_timeout：表示当前主机被Nginx认定为停机的最长失联时间，默认为10秒，常与max_fails使用。
+
+　　　　　　max_fails：表示 在fail_timeout时间内最多允许的失败次数。
+
+　　　  （2）ip_hash
+
+　　　　　　指定负载均衡基于客户端IP的分配方式。
+
+upstream lcldemo {
+        ip_hash;
+        192.168.1.105:8080 weight=2 fail_timeout=20 max_fail=3;
+        192.168.1.106:8080 weight=1 fail_timeout=20 max_fail=3;
+        192.168.1.107:8080 weight=2 fail_timeout=20 max_fail=3;
+        192.168.1.108:8080 weight=1 fail_timeout=20 max_fail=3;
+    }
+
+
+　　　　　　使用ip_hash直接指定负载均衡策略，对于该种策略需要注意以下几点：
+
+　　　　　　　　a、在nginx1.3.1之前，该策略不能指定weight属性
+
+　　　　　　　　b、该策略不能与backup同时使用
+
+　　　　　　　　c、此策略适合有状态的服务，例如session
+
+　　　　　　　　d、当有服务器宕机，必须手动指定down属性，否则请求仍然会落到该服务器。
+
+　　　　  （3）least_conn
+
+　　　　　　把请求转发给连接数最少的服务器。
+
+upstream lcldemo {
+        least_conn;
+        192.168.1.105:8080 weight=2 fail_timeout=20 max_fail=3;
+        192.168.1.106:8080 weight=1 fail_timeout=20 max_fail=3;
+        192.168.1.107:8080 backup;
+        192.168.1.108:8080 down;
+    }
+
+
+　　4、Nginx Plux的四层负载均衡实现
+
+　　　　同样是修改nginx配置文件，添加一个stream模块，其与events、http等模块同级，在其中配置upstream{}与server{}模块，此时需要注意，通行代理配置在server{}中（原来的是配置在server模块的location中），且不能再是http://开头的了，因为其负载均衡协议不再是http协议了。
+
+stream {
+    upstream app {
+        server 192.168.1.103:8080;
+        server 192.168.1.104:8080;
+        server 192.168.1.105:8080;
+    }
+
+    server {
+        listen 8080;
+        proxy_pass app;
+    }
+
+}
+
+
+四、动静分离
+
+　　动静分离主要就是让html、css、图片等内容直接走nginx，数据走tomcat。
+
+　　首先，配置两台静态资源nginx服务器（192.168.1.111，192.168.1.222），配置文件名拦截访问规则，然后在/opt/static文件夹中放入静态资源
+
+location ~ .*\.(css|js|html|png|jpg)$ {
+               root /opt/static;
+       }
+
+
+　　然后配置负载均衡服务器
+
+upstream lcldemo {
+        192.168.1.105:8080 weight=1;
+        192.168.1.106:8080 weight=1;
+        192.168.1.107:8080 weight=1;
+    }
+
+    server {
+.......
+       location ~ .*\.(css|js|html|png|jpg)$ {
+               proxy_pass lcldemo;
+       }
+
+五、虚拟主机
+
+　　可以直接修改nginx配置
+
+upstream www.lcl.com {
+        server 192.168.1.101:8080 weight=1;
+        server 192.168.1.102:8080 weight=1;
+     }
+
+     upstream bj.lcl.com {
+        server 192.168.1.201:8080 weight=1;
+        server 192.168.1.202:8080 weight=1;
+     }
+
+     upstream sh.lcl.com {
+        server 192.168.1.301:8080 weight=1;
+        server 192.168.1.302:8080 weight=1;
+     }
+
+
+     server {
+        listen 80;
+        servaer_name www.lcl.com;
+        location / {
+             proxy_pass http://www.lcl.com;
+        }
+     }
+
+
+     server {
+        listen 80;
+        servaer_name bj.lcl.com;
+        location / {
+             proxy_pass http://www.bj.lcl.com;
+        }
+     }
+
+
+     server {
+        listen 80;
+        servaer_name www.sh.lcl.com;
+        location / {
+             proxy_pass http://www.sh.lcl.com;
+        }
+     }
+
+
+
+　　也可以将该配置单独写一个配置文件，然后在nginx配置文件中引入
+
+include /usr/local/nginx/conf/vhosts.conf
